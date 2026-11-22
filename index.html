@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CK Doces Finos — Encomendas Artesanais</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Tipografia editorial para títulos e leitura limpa em telas móveis */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    h1, h2, h3, .brand-font {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .toast-enter {
+      animation: fadeSlideUp 0.22s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-amber-50/40 text-stone-800 min-h-screen flex flex-col selection:bg-amber-200 selection:text-amber-950">
+
+  <!-- Barra de Notificação Visual (Toast) -->
+  <div id="toast-container" class="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2 w-[92%] max-w-md pointer-events-none"></div>
+
+  <!-- Cabeçalho Compacto e Responsivo -->
+  <header class="bg-white/95 backdrop-blur sticky top-0 z-30 border-b border-amber-100 shadow-sm">
+    <div class="max-w-5xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2">
+      <button type="button" onclick="switchTab('catalog')" class="text-left min-w-0">
+        <span class="block text-base sm:text-xl font-bold text-amber-900 leading-tight truncate brand-font">CK Doces Finos</span>
+        <span class="block text-[11px] text-stone-500 truncate">Artesanais • Campinas - SP</span>
+      </button>
+
+      <nav class="flex items-center gap-1 sm:gap-2 shrink-0">
+        <button type="button" id="nav-btn-catalog" onclick="switchTab('catalog')" class="text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-100 text-amber-950 transition">
+          Cardápio
+        </button>
+        <button type="button" id="nav-btn-orders" onclick="switchTab('orders')" class="text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-2 rounded-xl text-stone-700 hover:bg-amber-50 transition">
+          Pedidos
+        </button>
+        <button type="button" onclick="openCart()" class="bg-amber-700 hover:bg-amber-800 active:scale-95 text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+          <span>Sacola</span>
+          <span id="cart-badge" class="bg-white text-amber-900 text-xs font-extrabold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Banner de Destaque -->
+  <section class="bg-gradient-to-br from-amber-950 via-amber-900 to-stone-900 text-white py-8 sm:py-11 px-4">
+    <div class="max-w-5xl mx-auto text-center space-y-2.5">
+      <span class="inline-block bg-amber-400/15 border border-amber-300/30 text-amber-200 text-[11px] font-semibold uppercase tracking-widest px-3 py-1 rounded-full">
+        Produção Sob Encomenda
+      </span>
+      <h1 class="text-2xl sm:text-4xl font-bold leading-snug">
+        Doces finos feitos para celebrar seus momentos
+      </h1>
+      <p class="text-amber-100/80 max-w-xl mx-auto text-xs sm:text-sm">
+        Escolha sabores, agende data e horário de retirada ou entrega e acompanhe sua encomenda.
+      </p>
+    </div>
+  </section>
+
+  <!-- Conteúdo Principal -->
+  <main class="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-8 flex-1 w-full">
+
+    <!-- ABA 1: CATÁLOGO PÚBLICO -->
+    <section id="view-catalog" class="space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-bold text-stone-900">Cardápio de Encomendas</h2>
+          <p class="text-xs text-stone-500">Agendamento mínimo com 24h de antecedência</p>
+        </div>
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+          <span id="sync-status-badge" class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Sincronizado
+          </span>
+        </div>
+      </div>
+
+      <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"></div>
+    </section>
+
+    <!-- ABA 2: ACOMPANHAR PEDIDOS -->
+    <section id="view-orders" class="hidden max-w-xl mx-auto bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-amber-100 space-y-4">
+      <div>
+        <h2 class="text-xl font-bold text-amber-950">Meus Pedidos</h2>
+        <p class="text-xs sm:text-sm text-stone-500 mt-1">Digite o WhatsApp com DDD usado na encomenda para consultar o andamento.</p>
+      </div>
+
+      <form onsubmit="handleSearchOrdersSubmit(event)" class="flex gap-2">
+        <input id="search-phone" type="tel" placeholder="(19) 99999-9999" class="flex-1 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600" />
+        <button type="submit" class="bg-amber-700 hover:bg-amber-800 text-white font-semibold px-4 sm:px-5 py-2.5 rounded-xl text-sm shrink-0 transition">
+          Buscar
+        </button>
+      </form>
+
+      <div id="orders-results" class="space-y-3">
+        <p class="text-xs text-stone-400 text-center py-4">Informe seu número de telefone acima para localizar suas encomendas.</p>
+      </div>
+    </section>
+
+    <!-- ABA 3: ÁREA DA CONFEITARIA (ADMIN) -->
+    <section id="view-admin" class="hidden bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-amber-100 space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+        <div>
+          <h2 class="text-xl font-bold text-amber-950">Área da Confeitaria</h2>
+          <p class="text-xs text-stone-500">Adicione, edite, pause ou remova doces do cardápio e gerencie encomendas.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="switchAdminSub('menu')" id="sub-btn-menu" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-700 text-white transition">
+            Gerenciar Cardápio
+          </button>
+          <button type="button" onclick="switchAdminSub('orders')" id="sub-btn-orders" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-stone-100 text-stone-700 hover:bg-stone-200 transition">
+            Encomendas
+          </button>
+          <button type="button" onclick="switchTab('catalog')" class="px-3 py-2 rounded-xl text-xs font-semibold text-stone-500 hover:bg-stone-100 transition">
+            Sair
+          </button>
+        </div>
+      </div>
+
+      <!-- SUB-ABA: GERENCIAR CARDÁPIO -->
+      <div id="admin-sub-menu" class="space-y-6">
+        <form id="product-form" onsubmit="saveProduct(event)" class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 sm:p-5 space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <h3 id="prod-form-title" class="font-bold text-amber-950 text-sm sm:text-base">+ Adicionar Novo Doce</h3>
+            <button type="button" id="btn-cancel-edit" onclick="resetProductForm()" class="hidden text-xs font-semibold text-red-600 hover:underline">
+              Cancelar edição
+            </button>
+          </div>
+
+          <input type="hidden" id="edit-prod-id" />
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="prod-name" class="block text-xs font-semibold text-stone-700 mb-1">Nome do Doce *</label>
+              <input id="prod-name" type="text" required placeholder="Ex: Cento de Brigadeiro Gourmet" class="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-600" />
+            </div>
+            <div>
+              <label for="prod-price" class="block text-xs font-semibold text-stone-700 mb-1">Preço (R$) *</label>
+              <input id="prod-price" type="number" step="0.01" min="0.50" required placeholder="Ex: 140.00" class="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-600" />
+            </div>
+          </div>
+
+          <div>
+            <label for="prod-desc" class="block text-xs font-semibold text-stone-700 mb-1">Descrição</label>
+            <input id="prod-desc" type="text" placeholder="Ex: Feito com chocolate nobre e acabamento artesanal." class="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-600" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="prod-flavors" class="block text-xs font-semibold text-stone-700 mb-1">Sabores (separados por vírgula)</label>
+              <input id="prod-flavors" type="text" placeholder="Ao Leite, Ninho, Churros" class="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-600" />
+            </div>
+            <div>
+              <label for="prod-img" class="block text-xs font-semibold text-stone-700 mb-1">URL da Foto (opcional)</label>
+              <input id="prod-img" type="url" placeholder="https://..." class="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-600" />
+            </div>
+          </div>
+
+          <!-- Atalhos rápidos de foto para facilitar no celular -->
+          <div>
+            <span class="block text-[11px] font-semibold text-stone-500 mb-1.5">Escolher foto rápida:</span>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="setPresetImage('https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?w=600&q=80')" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 transition">
+                Brigadeiros
+              </button>
+              <button type="button" onclick="setPresetImage('https://images.unsplash.com/photo-1548907040-4baa42d10919?w=600&q=80')" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 transition">
+                Caixa Presente
+              </button>
+              <button type="button" onclick="setPresetImage('https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80')" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 transition">
+                Torta / Brownie
+              </button>
+              <button type="button" onclick="setPresetImage('https://images.unsplash.com/photo-1515037893149-de7f840978e2?w=600&q=80')" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 transition">
+                Doces Variados
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-1 flex flex-wrap gap-2">
+            <button type="submit" id="btn-save-prod" class="w-full sm:w-auto bg-amber-700 hover:bg-amber-800 active:scale-[0.99] text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-sm transition">
+              Salvar no Cardápio
+            </button>
+          </div>
+        </form>
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-stone-800 text-sm sm:text-base">Itens Cadastrados</h3>
+            <button type="button" onclick="resetCatalogToDefault()" class="text-xs font-semibold text-stone-500 hover:text-amber-800 underline">
+              Restaurar padrão
+            </button>
+          </div>
+          <div id="admin-products-list" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- SUB-ABA: ENCOMENDAS -->
+      <div id="admin-sub-orders" class="hidden space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-stone-800 text-sm sm:text-base">Pedidos Recebidos</h3>
+          <button type="button" onclick="loadAdminOrders()" class="bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+            Atualizar Pedidos
+          </button>
+        </div>
+        <div id="admin-orders-list" class="space-y-3"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Rodapé com Acesso Rápido à Confeitaria -->
+  <footer class="bg-white border-t border-amber-100 py-6 px-4 text-center text-xs text-stone-500 space-y-2">
+    <p class="font-medium text-stone-600">Confeitaria CK Doces Finos • Campinas - SP</p>
+    <div>
+      <button type="button" onclick="openAdminModal()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold border border-amber-200 transition">
+        <span>Área da Confeitaria</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- MODAL DE SENHA DA CONFEITARIA (Substitui prompt() nativo) -->
+  <div id="admin-pin-modal" class="fixed inset-0 bg-black/55 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-xl border border-amber-100 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-amber-950 text-base">Acesso da Confeitaria</h3>
+        <button type="button" onclick="closeAdminModal()" class="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none">&times;</button>
+      </div>
+      <form onsubmit="verifyAdminPin(event)" class="space-y-3">
+        <div>
+          <label for="admin-pin-input" class="block text-xs font-semibold text-stone-600 mb-1">Senha de acesso (PIN)</label>
+          <input id="admin-pin-input" type="password" inputmode="numeric" required placeholder="Digite a senha" class="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600" />
+        </div>
+        <button type="submit" class="w-full bg-amber-700 hover:bg-amber-800 text-white font-bold py-2.5 rounded-xl text-sm transition">
+          Entrar
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- DRAWER DA SACOLA E CHECKOUT -->
+  <div id="cart-modal" class="fixed inset-0 bg-black/55 z-50 hidden justify-end">
+    <div class="bg-white w-full max-w-md h-full overflow-y-auto p-5 sm:p-6 flex flex-col justify-between shadow-2xl">
+      <div>
+        <div class="flex items-center justify-between border-b border-stone-100 pb-4 mb-4">
+          <h3 class="text-lg font-bold text-amber-950">Sua Encomenda</h3>
+          <button type="button" onclick="closeCart()" class="text-stone-400 hover:text-stone-700 text-2xl font-bold leading-none">&times;</button>
+        </div>
+
+        <!-- ETAPA 1: ITENS E FORMULÁRIO -->
+        <div id="checkout-form-step">
+          <div id="cart-items" class="space-y-2.5 mb-4"></div>
+
+          <div class="border-t border-b border-stone-100 py-3 mb-4 flex justify-between items-center font-bold text-base">
+            <span>Total</span>
+            <span id="cart-total" class="text-amber-800">R$ 0,00</span>
+          </div>
+
+          <form id="order-form" onsubmit="submitOrder(event)" class="space-y-3 text-sm">
+            <div>
+              <label for="cust-name" class="block font-semibold text-xs text-stone-700 mb-1">Seu Nome Completo *</label>
+              <input id="cust-name" type="text" required placeholder="Ex: Maria Silva" class="w-full border border-stone-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label for="cust-phone" class="block font-semibold text-xs text-stone-700 mb-1">WhatsApp (com DDD) *</label>
+                <input id="cust-phone" type="tel" required placeholder="19999999999" class="w-full border border-stone-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600" />
+              </div>
+              <div>
+                <label for="cust-email" class="block font-semibold text-xs text-stone-700 mb-1">E-mail *</label>
+                <input id="cust-email" type="email" required placeholder="seu@email.com" class="w-full border border-stone-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label for="sched-date" class="block font-semibold text-xs text-stone-700 mb-1">Data da Encomenda *</label>
+                <input id="sched-date" type="date" required class="w-full border border-stone-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600" />
+              </div>
+              <div>
+                <label for="sched-slot" class="block font-semibold text-xs text-stone-700 mb-1">Janela de Horário *</label>
+                <select id="sched-slot" required class="w-full border border-stone-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-amber-600">
+                  <option value="10:00 - 12:00">10:00 às 12:00</option>
+                  <option value="14:00 - 16:00">14:00 às 16:00</option>
+                  <option value="16:00 - 18:00">16:00 às 18:00</option>
+                  <option value="18:00 - 20:00">18:00 às 20:00</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label for="delivery-type" class="block font-semibold text-xs text-stone-700 mb-1">Recebimento *</label>
+              <select id="delivery-type" onchange="toggleAddress()" class="w-full border border-stone-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-amber-600">
+                <option value="pickup">Retirada no Local (Grátis)</option>
+                <option value="delivery">Entrega em Campinas (Taxa a combinar)</option>
+              </select>
+            </div>
+
+            <div id="address-box" class="hidden">
+              <label for="cust-address" class="block font-semibold text-xs text-stone-700 mb-1">Endereço Completo para Entrega *</label>
+              <input id="cust-address" type="text" placeholder="Rua, número, bairro e complemento" class="w-full border border-stone-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600" />
+            </div>
+
+            <div>
+              <span class="block font-semibold text-xs text-stone-700 mb-1">Forma de Pagamento *</span>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="border rounded-xl p-2.5 flex items-center gap-2 cursor-pointer has-[:checked]:border-amber-600 has-[:checked]:bg-amber-50">
+                  <input type="radio" name="pay-method" value="pix" checked />
+                  <span class="font-semibold text-xs">Pix Instantâneo</span>
+                </label>
+                <label class="border rounded-xl p-2.5 flex items-center gap-2 cursor-pointer has-[:checked]:border-amber-600 has-[:checked]:bg-amber-50">
+                  <input type="radio" name="pay-method" value="card" />
+                  <span class="font-semibold text-xs">Cartão</span>
+                </label>
+              </div>
+            </div>
+
+            <button id="btn-submit-order" type="submit" class="w-full bg-amber-700 hover:bg-amber-800 active:scale-[0.99] text-white font-bold py-3 rounded-xl shadow-md transition mt-2">
+              Finalizar Encomenda
+            </button>
+          </form>
+        </div>
+
+        <!-- ETAPA 2: PAGAMENTO PIX -->
+        <div id="pix-payment-step" class="hidden text-center space-y-4 py-4">
+          <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">Pix Gerado</span>
+          <h4 class="font-bold text-lg text-stone-900">Escaneie ou copie o código Pix</h4>
+          <img id="pix-qr-img" src="https://placehold.co/220x220/fffbeb/78350f?text=QR+Code+Pix" onerror="this.src='https://placehold.co/220x220/fffbeb/78350f?text=Pix'" class="w-44 h-44 mx-auto border rounded-xl p-2 bg-white shadow-sm object-contain" alt="QR Code Pix" />
+          <div class="text-left">
+            <label for="pix-copy-paste" class="text-xs font-semibold text-stone-500">Pix Copia e Cola:</label>
+            <div class="flex gap-2 mt-1">
+              <input id="pix-copy-paste" type="text" readonly class="flex-1 border rounded-lg px-2.5 py-2 text-xs bg-stone-50" />
+              <button type="button" onclick="copyPix()" class="bg-stone-800 hover:bg-stone-900 text-white text-xs px-3 py-2 rounded-lg font-semibold transition">
+                Copiar
+              </button>
+            </div>
+          </div>
+          <button type="button" id="btn-confirm-pix-manual" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition">
+            Já realizei o pagamento Pix
+          </button>
+        </div>
+
+        <!-- ETAPA 3: PEDIDO CONFIRMADO -->
+        <div id="order-confirmed-step" class="hidden text-center space-y-4 py-6">
+          <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-2xl font-extrabold">✓</div>
+          <h4 class="text-xl font-bold text-stone-900">Encomenda Registrada!</h4>
+          <p id="confirmed-summary" class="text-sm text-stone-600"></p>
+          <a id="btn-whatsapp-confirm" href="#" target="_blank" rel="noopener noreferrer" class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow transition">
+            Enviar Comprovante no WhatsApp
+          </a>
+          <button type="button" onclick="resetAndClose()" class="text-xs font-semibold text-stone-500 hover:text-stone-800 underline">
+            Voltar ao cardápio
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // CONFIGURAÇÃO PRINCIPAL E ESTADO RESILIENTE (SUPABASE + LOCALSTORAGE)
+    // =========================================================================
+    const SUPABASE_URL = "https://rlpzeoyhwcsybenscoxb.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_wZzbA8uuhP-hHKdYDyEyeA_GRpF96LE";
+    const WHATSAPP_CONFEITARIA = "5519999999999";
+    const ADMIN_PIN = "1234";
+
+    const STORAGE_KEYS = {
+      products: "ck_doces_products_v2",
+      orders: "ck_doces_orders_v2"
+    };
+
+    const FALLBACK_IMG = "https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?w=600&q=80";
+
+    const DEFAULT_PRODUCTS = [
+      {
+        id: 1,
+        name: "Cento de Brigadeiro Gourmet",
+        price: 140.00,
+        description: "100 unidades feitas com chocolate nobre e confeitos selecionados.",
+        flavors: ["Ao Leite", "Ninho com Nutella", "Churros", "Creme Brûlée"],
+        img: "https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?w=600&q=80",
+        active: true
+      },
+      {
+        id: 2,
+        name: "Caixa Presente 12 Doces Finos",
+        price: 48.00,
+        description: "Caixa cartonada elegante com fita, ideal para presentear.",
+        flavors: ["Mista Clássica", "Só Chocolate", "Morango & Ninho"],
+        img: "https://images.unsplash.com/photo-1548907040-4baa42d10919?w=600&q=80",
+        active: true
+      },
+      {
+        id: 3,
+        name: "Torta Brownie Chocolatuda (1,5kg)",
+        price: 115.00,
+        description: "Base densa de brownie com camadas cremosas de brigadeiro.",
+        flavors: ["Ninho c/ Nutella", "Ferrero Rocher", "Kinder Bueno"],
+        img: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80",
+        active: true
+      },
+      {
+        id: 4,
+        name: "Kit Festa Mini Brownies (30 un.)",
+        price: 95.00,
+        description: "Brownies individuais embalados com cobertura artesanal.",
+        flavors: ["Doce de Leite", "Brigadeiro Meio Amargo", "Ninho"],
+        img: "https://images.unsplash.com/photo-1515037893149-de7f840978e2?w=600&q=80",
+        active: true
+      }
+    ];
+
+    const DEFAULT_ORDERS = [
+      {
+        id: 101,
+        customer_name: "Ana Paula Souza",
+        customer_phone: "19998887766",
+        customer_email: "ana.souza@exemplo.com",
+        items: [{ id: 1, name: "Cento de Brigadeiro Gourmet", flavor: "Ninho com Nutella", qty: 1, price: 140 }],
+        total: 140,
+        delivery_type: "pickup",
+        address: "Retirada no Local",
+        scheduled_date: "2026-11-24",
+        scheduled_slot: "14:00 - 16:00",
+        payment_method: "pix",
+        payment_status: "approved",
+        order_status: "confirmado_pago",
+        created_at: new Date().toISOString()
+      }
+    ];
+
+    let sb = null;
+    try {
+      if (window.supabase && typeof window.supabase.createClient === "function") {
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+    } catch (e) {
+      sb = null;
+    }
+
+    let PRODUCTS = [];
+    let ORDERS_CACHE = [];
+    let cart = [];
+    let pollInterval = null;
+    let activePixOrder = null;
+
+    // =========================================================================
+    // UTILITÁRIOS DE UI E STORAGE
+    // =========================================================================
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toast-container");
+      if (!container) return;
+
+      const palette = {
+        success: "bg-stone-900 text-white border-emerald-500/50",
+        warn: "bg-amber-950 text-amber-50 border-amber-400/50",
+        error: "bg-red-900 text-white border-red-400/50"
+      };
+
+      const el = document.createElement("div");
+      el.className = `toast-enter border px-4 py-2.5 rounded-xl shadow-lg text-xs sm:text-sm font-semibold text-center ${palette[type] || palette.success}`;
+      el.textContent = message;
+      container.appendChild(el);
+
+      setTimeout(() => {
+        el.style.opacity = "0";
+        el.style.transition = "opacity 0.2s ease";
+        setTimeout(() => el.remove(), 220);
+      }, 2800);
+    }
+
+    function setSyncBadge(synced) {
+      const badge = document.getElementById("sync-status-badge");
+      if (!badge) return;
+      if (synced) {
+        badge.textContent = "Nuvem + Local";
+        badge.className = "text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+      } else {
+        badge.textContent = "Salvo no Aparelho";
+        badge.className = "text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200";
+      }
+    }
+
+    function readLocalProducts() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.products);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeLocalProducts(list) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(list));
+      } catch (e) {
+        // Ignora erro de quota do navegador
+      }
+    }
+
+    function readLocalOrders() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.orders);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeLocalOrders(list) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(list));
+      } catch (e) {
+        // Ignora erro de quota
+      }
+    }
+
+    function formatBRL(value) {
+      const num = Number(value) || 0;
+      return `R$ ${num.toFixed(2).replace(".", ",")}`;
+    }
+
+    function sanitizeImageUrl(url) {
+      const trimmed = (url || "").trim();
+      if (!trimmed) return FALLBACK_IMG;
+      if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+        return trimmed;
+      }
+      return FALLBACK_IMG;
+    }
+
+    function normalizeFlavors(rawFlavors) {
+      if (Array.isArray(rawFlavors) && rawFlavors.length > 0) {
+        return rawFlavors.map(f => String(f).trim()).filter(Boolean);
+      }
+      if (typeof rawFlavors === "string" && rawFlavors.trim()) {
+        try {
+          const parsed = JSON.parse(rawFlavors);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map(f => String(f).trim()).filter(Boolean);
+          }
+        } catch (e) {
+          const split = rawFlavors.split(",").map(s => s.trim()).filter(Boolean);
+          if (split.length > 0) return split;
+        }
+      }
+      return ["Tradicional"];
+    }
+
+    // =========================================================================
+    // CARREGAMENTO E GERENCIAMENTO DO CARDÁPIO
+    // =========================================================================
+    async function initCatalog() {
+      const localItems = readLocalProducts();
+      if (localItems && localItems.length > 0) {
+        PRODUCTS = localItems;
+      } else {
+        PRODUCTS = DEFAULT_PRODUCTS.map(item => ({ ...item }));
+        writeLocalProducts(PRODUCTS);
+      }
+
+      renderCatalog();
+      renderAdminProducts();
+
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("products").select("*").order("id", { ascending: true });
+          if (!error && Array.isArray(data)) {
+            if (data.length > 0) {
+              PRODUCTS = data.map(p => ({
+                id: p.id,
+                name: p.name || "Doce Artesanal",
+                price: Number(p.price) || 0,
+                description: p.description || p.desc || "",
+                flavors: normalizeFlavors(p.flavors),
+                img: sanitizeImageUrl(p.img),
+                active: p.active !== false
+              }));
+              writeLocalProducts(PRODUCTS);
+              renderCatalog();
+              renderAdminProducts();
+            }
+            setSyncBadge(true);
+            return;
+          }
+        } catch (err) {
+          // Mantém dados locais
+        }
+      }
+      setSyncBadge(false);
+    }
+
+    function renderCatalog() {
+      const grid = document.getElementById("products-grid");
+      if (!grid) return;
+
+      const activeProds = PRODUCTS.filter(p => p.active !== false);
+      if (!activeProds.length) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white border border-amber-100 rounded-2xl p-8 text-center space-y-2">
+            <p class="font-bold text-stone-700">Nenhum doce ativo no cardápio no momento.</p>
+            <p class="text-xs text-stone-500">Você pode ativar ou adicionar itens na Área da Confeitaria.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = activeProds.map(p => {
+        const flavors = normalizeFlavors(p.flavors);
+        const imgSrc = sanitizeImageUrl(p.img);
+
+        return `
+          <article class="bg-white rounded-2xl overflow-hidden shadow-sm border border-amber-100/90 flex flex-col justify-between hover:shadow-md transition">
+            <div>
+              <img
+                src="${imgSrc}"
+                alt="${p.name}"
+                onerror="this.src='${FALLBACK_IMG}'"
+                class="w-full h-44 object-cover bg-amber-50"
+              />
+              <div class="p-4 space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                  <h3 class="font-bold text-stone-900 text-base leading-snug">${p.name}</h3>
+                  <span class="font-extrabold text-amber-800 text-sm whitespace-nowrap">${formatBRL(p.price)}</span>
+                </div>
+                <p class="text-xs text-stone-500 leading-relaxed">${p.description || "Preparo artesanal sob encomenda."}</p>
+                <div class="pt-1.5">
+                  <label for="flavor-${p.id}" class="block text-[11px] font-semibold text-stone-600 mb-1">Escolha o sabor:</label>
+                  <select id="flavor-${p.id}" class="w-full border border-stone-200 rounded-xl px-3 py-2 text-xs bg-amber-50/40 focus:outline-none focus:ring-2 focus:ring-amber-600">
+                    ${flavors.map(f => `<option value="${f}">${f}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 pt-1">
+              <button type="button" onclick="addToCart(${p.id})" class="w-full bg-amber-100 hover:bg-amber-700 hover:text-white active:scale-[0.99] text-amber-950 font-bold text-xs py-2.5 rounded-xl transition">
+                + Adicionar à Sacola
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderAdminProducts() {
+      const list = document.getElementById("admin-products-list");
+      if (!list) return;
+
+      if (!PRODUCTS.length) {
+        list.innerHTML = `<p class="text-xs text-stone-400 text-center py-6 bg-stone-50 rounded-xl border">Nenhum doce cadastrado. Use o formulário acima para adicionar.</p>`;
+        return;
+      }
+
+      list.innerHTML = PRODUCTS.map(p => {
+        const isActive = p.active !== false;
+        const flavorsText = normalizeFlavors(p.flavors).join(", ");
+        const imgSrc = sanitizeImageUrl(p.img);
+
+        return `
+          <div class="border border-stone-200/90 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-50/70">
+            <div class="flex items-center gap-3 min-w-0">
+              <img
+                src="${imgSrc}"
+                alt="${p.name}"
+                onerror="this.src='${FALLBACK_IMG}'"
+                class="w-14 h-14 rounded-xl object-cover shrink-0 bg-white border"
+              />
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <p class="font-bold text-sm text-stone-900 truncate">${p.name}</p>
+                  <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${isActive ? "bg-emerald-100 text-emerald-800" : "bg-stone-200 text-stone-600"}">
+                    ${isActive ? "Ativo" : "Pausado"}
+                  </span>
+                </div>
+                <p class="text-amber-800 font-extrabold text-xs mt-0.5">${formatBRL(p.price)}</p>
+                <p class="text-[11px] text-stone-500 truncate">Sabores: ${flavorsText}</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
+              <button type="button" onclick="editProduct(${p.id})" class="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs transition">
+                Editar
+              </button>
+              <button type="button" onclick="toggleProductActive(${p.id})" class="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs transition">
+                ${isActive ? "Pausar" : "Ativar"}
+              </button>
+              <button type="button" onclick="deleteProduct(${p.id})" class="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs transition">
+                Excluir
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function setPresetImage(url) {
+      const input = document.getElementById("prod-img");
+      if (input) {
+        input.value = url;
+        showToast("Foto selecionada!", "success");
+      }
+    }
+
+    async function saveProduct(event) {
+      event.preventDefault();
+
+      const editIdRaw = document.getElementById("edit-prod-id").value;
+      const name = document.getElementById("prod-name").value.trim();
+      const price = Number(document.getElementById("prod-price").value);
+      const description = document.getElementById("prod-desc").value.trim();
+      const flavorsRaw = document.getElementById("prod-flavors").value;
+      const img = sanitizeImageUrl(document.getElementById("prod-img").value);
+
+      if (!name) {
+        showToast("Informe o nome do doce.", "warn");
+        return;
+      }
+      if (!Number.isFinite(price) || price <= 0) {
+        showToast("Informe um preço válido maior que zero.", "warn");
+        return;
+      }
+
+      const flavors = flavorsRaw
+        ? flavorsRaw.split(",").map(s => s.trim()).filter(Boolean)
+        : ["Tradicional"];
+
+      if (editIdRaw) {
+        const targetId = Number(editIdRaw);
+        let updatedItem = null;
+
+        PRODUCTS = PRODUCTS.map(item => {
+          if (Number(item.id) === targetId) {
+            updatedItem = { ...item, name, price, description, flavors, img };
+            return updatedItem;
+          }
+          return item;
+        });
+
+        writeLocalProducts(PRODUCTS);
+        renderCatalog();
+        renderAdminProducts();
+        resetProductForm();
+        showToast("Doce atualizado no cardápio!", "success");
+
+        if (sb && updatedItem) {
+          try {
+            const { error } = await sb.from("products").update({
+              name: updatedItem.name,
+              price: updatedItem.price,
+              description: updatedItem.description,
+              flavors: updatedItem.flavors,
+              img: updatedItem.img
+            }).eq("id", targetId);
+            if (!error) setSyncBadge(true);
+          } catch (e) {
+            // Mantém salvo localmente
+          }
+        }
+      } else {
+        const nextId = PRODUCTS.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0) + 1;
+        const newProduct = {
+          id: nextId,
+          name,
+          price,
+          description,
+          flavors,
+          img,
+          active: true
+        };
+
+        PRODUCTS = [...PRODUCTS, newProduct];
+        writeLocalProducts(PRODUCTS);
+        renderCatalog();
+        renderAdminProducts();
+        resetProductForm();
+        showToast("Novo doce adicionado ao cardápio!", "success");
+
+        if (sb) {
+          try {
+            const { data: inserted, error } = await sb.from("products").insert([{
+              name: newProduct.name,
+              price: newProduct.price,
+              description: newProduct.description,
+              flavors: newProduct.flavors,
+              img: newProduct.img,
+              active: true
+            }]).select().single();
+
+            if (!error && inserted && inserted.id) {
+              PRODUCTS = PRODUCTS.map(p => Number(p.id) === nextId ? { ...p, id: inserted.id } : p);
+              writeLocalProducts(PRODUCTS);
+              renderCatalog();
+              renderAdminProducts();
+              setSyncBadge(true);
+            }
+          } catch (e) {
+            // Mantém salvo localmente
+          }
+        }
+      }
+    }
+
+    function editProduct(id) {
+      const target = PRODUCTS.find(p => Number(p.id) === Number(id));
+      if (!target) {
+        showToast("Item não encontrado para edição.", "warn");
+        return;
+      }
+
+      document.getElementById("edit-prod-id").value = target.id;
+      document.getElementById("prod-name").value = target.name || "";
+      document.getElementById("prod-price").value = target.price || "";
+      document.getElementById("prod-desc").value = target.description || "";
+      document.getElementById("prod-flavors").value = normalizeFlavors(target.flavors).join(", ");
+      document.getElementById("prod-img").value = target.img || "";
+      document.getElementById("prod-form-title").textContent = `Editando: ${target.name}`;
+      document.getElementById("btn-cancel-edit").classList.remove("hidden");
+
+      const formEl = document.getElementById("product-form");
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      showToast(`Editando "${target.name}"`, "warn");
+    }
+
+    function resetProductForm() {
+      const form = document.getElementById("product-form");
+      if (form) form.reset();
+      document.getElementById("edit-prod-id").value = "";
+      document.getElementById("prod-form-title").textContent = "+ Adicionar Novo Doce";
+      document.getElementById("btn-cancel-edit").classList.add("hidden");
+    }
+
+    async function toggleProductActive(id) {
+      let nextState = true;
+      PRODUCTS = PRODUCTS.map(p => {
+        if (Number(p.id) === Number(id)) {
+          nextState = p.active === false ? true : false;
+          return { ...p, active: nextState };
+        }
+        return p;
+      });
+
+      writeLocalProducts(PRODUCTS);
+      renderCatalog();
+      renderAdminProducts();
+      showToast(nextState ? "Doce ativado no cardápio." : "Doce pausado no cardápio.", "success");
+
+      if (sb) {
+        try {
+          const { error } = await sb.from("products").update({ active: nextState }).eq("id", id);
+          if (!error) setSyncBadge(true);
+        } catch (e) {
+          // Mantém local
+        }
+      }
+    }
+
+    async function deleteProduct(id) {
+      const editingId = Number(document.getElementById("edit-prod-id").value);
+      PRODUCTS = PRODUCTS.filter(p => Number(p.id) !== Number(id));
+      writeLocalProducts(PRODUCTS);
+
+      if (editingId === Number(id)) {
+        resetProductForm();
+      }
+
+      renderCatalog();
+      renderAdminProducts();
+      showToast("Item removido do cardápio.", "success");
+
+      if (sb) {
+        try {
+          const { error } = await sb.from("products").delete().eq("id", id);
+          if (!error) setSyncBadge(true);
+        } catch (e) {
+          // Mantém local
+        }
+      }
+    }
+
+    function resetCatalogToDefault() {
+      PRODUCTS = DEFAULT_PRODUCTS.map(item => ({ ...item }));
+      writeLocalProducts(PRODUCTS);
+      resetProductForm();
+      renderCatalog();
+      renderAdminProducts();
+      showToast("Cardápio padrão restaurado.", "success");
+    }
+
+    // =========================================================================
+    // SACOLA E CHECKOUT
+    // =========================================================================
+    function addToCart(id) {
+      const prod = PRODUCTS.find(p => Number(p.id) === Number(id));
+      if (!prod) return;
+
+      const flavors = normalizeFlavors(prod.flavors);
+      const selectEl = document.getElementById(`flavor-${id}`);
+      const flavor = selectEl ? selectEl.value : flavors[0];
+
+      const existing = cart.find(item => Number(item.id) === Number(id) && item.flavor === flavor);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({
+          id: prod.id,
+          name: prod.name,
+          price: Number(prod.price) || 0,
+          flavor,
+          qty: 1
+        });
+      }
+
+      updateCartUI();
+      openCart();
+      showToast(`"${prod.name}" adicionado à sacola.`, "success");
+    }
+
+    function changeQty(index, delta) {
+      if (!cart[index]) return;
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      }
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      const totalItems = cart.reduce((sum, item) => sum + item.qty, 0);
+      const totalAmount = cart.reduce((sum, item) => sum + (Number(item.price) || 0) * item.qty, 0);
+
+      document.getElementById("cart-badge").textContent = String(totalItems);
+      document.getElementById("cart-total").textContent = formatBRL(totalAmount);
+
+      const container = document.getElementById("cart-items");
+      if (!cart.length) {
+        container.innerHTML = `<p class="text-xs text-stone-400 text-center py-4 bg-stone-50 rounded-xl border border-dashed">Sua sacola está vazia.</p>`;
+        return;
+      }
+
+      container.innerHTML = cart.map((item, idx) => `
+        <div class="flex items-center justify-between gap-2 bg-stone-50 p-3 rounded-xl border border-stone-200/80 text-xs">
+          <div class="min-w-0">
+            <p class="font-bold text-stone-900 truncate">${item.name}</p>
+            <p class="text-stone-500">Sabor: ${item.flavor}</p>
+            <p class="text-amber-800 font-bold mt-0.5">${formatBRL(item.price * item.qty)}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="changeQty(${idx}, -1)" class="w-7 h-7 rounded-full bg-white border font-bold text-stone-700 hover:bg-stone-100">-</button>
+            <span class="font-bold w-4 text-center">${item.qty}</span>
+            <button type="button" onclick="changeQty(${idx}, 1)" class="w-7 h-7 rounded-full bg-white border font-bold text-stone-700 hover:bg-stone-100">+</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function openCart() {
+      const modal = document.getElementById("cart-modal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      updateCartUI();
+    }
+
+    function closeCart() {
+      const modal = document.getElementById("cart-modal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    function resetAndClose() {
+      cart = [];
+      activePixOrder = null;
+      updateCartUI();
+      document.getElementById("checkout-form-step").classList.remove("hidden");
+      document.getElementById("pix-payment-step").classList.add("hidden");
+      document.getElementById("order-confirmed-step").classList.add("hidden");
+      closeCart();
+    }
+
+    function toggleAddress() {
+      const isDelivery = document.getElementById("delivery-type").value === "delivery";
+      document.getElementById("address-box").classList.toggle("hidden", !isDelivery);
+      const addrInput = document.getElementById("cust-address");
+      addrInput.required = isDelivery;
+    }
+
+    async function submitOrder(event) {
+      event.preventDefault();
+      if (!cart.length) {
+        showToast("Adicione pelo menos 1 doce antes de finalizar.", "warn");
+        return;
+      }
+
+      const btn = document.getElementById("btn-submit-order");
+      btn.disabled = true;
+      btn.textContent = "Registrando encomenda...";
+
+      const total = cart.reduce((sum, item) => sum + (Number(item.price) || 0) * item.qty, 0);
+      const customerName = document.getElementById("cust-name").value.trim();
+      const customerPhone = document.getElementById("cust-phone").value.replace(/\D/g, "");
+      const customerEmail = document.getElementById("cust-email").value.trim();
+      const scheduledDate = document.getElementById("sched-date").value;
+      const scheduledSlot = document.getElementById("sched-slot").value;
+      const deliveryType = document.getElementById("delivery-type").value;
+      const address = document.getElementById("cust-address").value.trim();
+      const methodInput = document.querySelector('input[name="pay-method"]:checked');
+      const method = methodInput ? methodInput.value : "pix";
+
+      const localOrders = readLocalOrders() || DEFAULT_ORDERS;
+      const nextOrderId = localOrders.reduce((max, o) => Math.max(max, Number(o.id) || 100), 100) + 1;
+
+      const orderRecord = {
+        id: nextOrderId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail,
+        items: cart.map(i => ({ ...i })),
+        total,
+        delivery_type: deliveryType,
+        address: deliveryType === "delivery" ? address : "Retirada no Local",
+        scheduled_date: scheduledDate,
+        scheduled_slot: scheduledSlot,
+        payment_method: method,
+        payment_status: "pending",
+        order_status: "aguardando_pagamento",
+        created_at: new Date().toISOString()
+      };
+
+      ORDERS_CACHE = [orderRecord, ...localOrders];
+      writeLocalOrders(ORDERS_CACHE);
+
+      if (sb) {
+        try {
+          const { data: inserted } = await sb.from("orders").insert([{
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            customer_email: customerEmail,
+            items: orderRecord.items,
+            total,
+            delivery_type: deliveryType,
+            address: orderRecord.address,
+            scheduled_date: scheduledDate,
+            scheduled_slot: scheduledSlot,
+            payment_method: method,
+            payment_status: "pending",
+            order_status: "aguardando_pagamento"
+          }]).select().single();
+
+          if (inserted && inserted.id) {
+            orderRecord.id = inserted.id;
+            ORDERS_CACHE[0] = orderRecord;
+            writeLocalOrders(ORDERS_CACHE);
+          }
+        } catch (err) {
+          // Mantém encomenda salva localmente
+        }
+      }
+
+      activePixOrder = orderRecord;
+      btn.disabled = false;
+      btn.textContent = "Finalizar Encomenda";
+
+      if (method === "pix") {
+        document.getElementById("checkout-form-step").classList.add("hidden");
+        document.getElementById("pix-payment-step").classList.remove("hidden");
+        document.getElementById("pix-copy-paste").value = `00020126580014BR.GOV.BCB.PIX0136ckdocesfinos@campinas.com.br520400005303986540${total.toFixed(2).replace(".", "")}5802BR5916CK DOCES FINOS6008CAMPINAS62070503***6304`;
+        showToast("Encomenda gerada! Confirme o Pix.", "success");
+      } else {
+        showOrderConfirmed(orderRecord);
+      }
+    }
+
+    function copyPix() {
+      const input = document.getElementById("pix-copy-paste");
+      if (!input) return;
+      input.select();
+      input.setSelectionRange(0, 99999);
+      try {
+        document.execCommand("copy");
+      } catch (e) {
+        // Ignora fallback
+      }
+      showToast("Código Pix copiado!", "success");
+    }
+
+    function confirmPixPaymentNow() {
+      if (!activePixOrder) return;
+      activePixOrder.payment_status = "approved";
+      activePixOrder.order_status = "confirmado_pago";
+      ORDERS_CACHE = ORDERS_CACHE.map(o => Number(o.id) === Number(activePixOrder.id) ? activePixOrder : o);
+      writeLocalOrders(ORDERS_CACHE);
+      showOrderConfirmed(activePixOrder);
+    }
+
+    function showOrderConfirmed(order) {
+      document.getElementById("checkout-form-step").classList.add("hidden");
+      document.getElementById("pix-payment-step").classList.add("hidden");
+      document.getElementById("order-confirmed-step").classList.remove("hidden");
+
+      const itemsSummary = (order.items || []).map(i => `• ${i.qty}x ${i.name} (${i.flavor})`).join("%0A");
+      const msg = `Olá, CK Doces Finos! Pedido *#${order.id}*:%0A${itemsSummary}%0A*Data:* ${order.scheduled_date} (${order.scheduled_slot})%0A*Total:* ${formatBRL(order.total)}`;
+
+      document.getElementById("confirmed-summary").textContent =
+        `Pedido #${order.id} agendado para ${order.scheduled_date} (${order.scheduled_slot}) — Total: ${formatBRL(order.total)}.`;
+      document.getElementById("btn-whatsapp-confirm").href =
+        `https://wa.me/${WHATSAPP_CONFEITARIA}?text=${encodeURIComponent(decodeURIComponent(msg))}`;
+    }
+
+    // =========================================================================
+    // CONSULTA DE PEDIDOS E NAVEGAÇÃO
+    // =========================================================================
+    function handleSearchOrdersSubmit(event) {
+      event.preventDefault();
+      searchOrders();
+    }
+
+    async function searchOrders() {
+      const phone = document.getElementById("search-phone").value.replace(/\D/g, "");
+      const resultsEl = document.getElementById("orders-results");
+      if (!phone) {
+        showToast("Digite seu WhatsApp com DDD para buscar.", "warn");
+        return;
+      }
+
+      const localOrders = readLocalOrders() || DEFAULT_ORDERS;
+      let matches = localOrders.filter(o => String(o.customer_phone || "").replace(/\D/g, "").includes(phone));
+
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("orders").select("*").eq("customer_phone", phone).order("created_at", { ascending: false });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            matches = data;
+          }
+        } catch (e) {
+          // Usa resultado local
+        }
+      }
+
+      if (!matches.length) {
+        resultsEl.innerHTML = `<p class="text-xs text-stone-500 text-center py-4 bg-stone-50 rounded-xl border">Nenhuma encomenda encontrada para esse número.</p>`;
+        return;
+      }
+
+      resultsEl.innerHTML = matches.map(o => `
+        <div class="border border-stone-200 rounded-xl p-4 bg-stone-50 text-xs sm:text-sm space-y-1">
+          <div class="flex items-center justify-between gap-2 font-bold">
+            <span>Pedido #${o.id}</span>
+            <span class="uppercase text-[11px] px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950">${String(o.order_status || "aguardando_pagamento").replace(/_/g, " ")}</span>
+          </div>
+          <p class="text-xs text-stone-600">${o.scheduled_date} • ${o.scheduled_slot}</p>
+          <p class="text-xs text-stone-600">${(o.items || []).map(i => `${i.qty}x ${i.name} (${i.flavor})`).join(", ")}</p>
+          <p class="font-bold text-amber-800 pt-1">Total: ${formatBRL(o.total)}</p>
+        </div>
+      `).join("");
+    }
+
+    function switchTab(tab) {
+      ["catalog", "orders", "admin"].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        if (view) view.classList.toggle("hidden", t !== tab);
+      });
+
+      const navCatalog = document.getElementById("nav-btn-catalog");
+      const navOrders = document.getElementById("nav-btn-orders");
+      if (navCatalog) {
+        navCatalog.className = tab === "catalog"
+          ? "text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-100 text-amber-950 transition"
+          : "text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-2 rounded-xl text-stone-700 hover:bg-amber-50 transition";
+      }
+      if (navOrders) {
+        navOrders.className = tab === "orders"
+          ? "text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-100 text-amber-950 transition"
+          : "text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-2 rounded-xl text-stone-700 hover:bg-amber-50 transition";
+      }
+    }
+
+    function openAdminModal() {
+      const modal = document.getElementById("admin-pin-modal");
+      const input = document.getElementById("admin-pin-input");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      input.value = "";
+      setTimeout(() => input.focus(), 60);
+    }
+
+    function closeAdminModal() {
+      const modal = document.getElementById("admin-pin-modal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    function verifyAdminPin(event) {
+      event.preventDefault();
+      const pin = document.getElementById("admin-pin-input").value.trim();
+      if (pin === ADMIN_PIN) {
+        closeAdminModal();
+        switchTab("admin");
+        switchAdminSub("menu");
+        renderAdminProducts();
+        loadAdminOrders();
+        showToast("Bem-vinda à Área da Confeitaria!", "success");
+      } else {
+        showToast("Senha incorreta. Tente novamente.", "error");
+      }
+    }
+
+    function switchAdminSub(sub) {
+      document.getElementById("admin-sub-orders").classList.toggle("hidden", sub !== "orders");
+      document.getElementById("admin-sub-menu").classList.toggle("hidden", sub !== "menu");
+
+      document.getElementById("sub-btn-orders").className = sub === "orders"
+        ? "px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-700 text-white transition"
+        : "px-3.5 py-2 rounded-xl text-xs font-bold bg-stone-100 text-stone-700 hover:bg-stone-200 transition";
+
+      document.getElementById("sub-btn-menu").className = sub === "menu"
+        ? "px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-700 text-white transition"
+        : "px-3.5 py-2 rounded-xl text-xs font-bold bg-stone-100 text-stone-700 hover:bg-stone-200 transition";
+    }
+
+    async function loadAdminOrders() {
+      const listEl = document.getElementById("admin-orders-list");
+      if (!listEl) return;
+
+      let orders = readLocalOrders() || DEFAULT_ORDERS;
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("orders").select("*").order("created_at", { ascending: false });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            orders = data;
+          }
+        } catch (e) {
+          // Mantém lista local
+        }
+      }
+
+      ORDERS_CACHE = orders;
+
+      if (!orders.length) {
+        listEl.innerHTML = `<p class="text-xs text-stone-400 text-center py-6 bg-stone-50 rounded-xl border">Nenhuma encomenda cadastrada ainda.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = orders.map(o => {
+        const cleanPhone = String(o.customer_phone || "").replace(/\D/g, "");
+        const statusLabel = String(o.order_status || "aguardando_pagamento").replace(/_/g, " ").toUpperCase();
+        const waText = encodeURIComponent(`Olá, *${o.customer_name}*! Aqui é da *CK Doces Finos*. Seu pedido *#${o.id}* para *${o.scheduled_date}* (${o.scheduled_slot}) está *${statusLabel}*.`);
+
+        return `
+          <div class="border border-stone-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-50 text-xs sm:text-sm">
+            <div class="space-y-1 min-w-0">
+              <p class="font-bold text-stone-900">#${o.id} — ${o.customer_name} (${o.customer_phone})</p>
+              <p class="text-xs text-stone-600">${o.scheduled_date} às ${o.scheduled_slot} • ${o.delivery_type === "delivery" ? o.address : "Retirada no Local"}</p>
+              <p class="text-xs text-stone-700">${(o.items || []).map(i => `${i.qty}x ${i.name} (${i.flavor})`).join(" • ")}</p>
+              <p class="font-extrabold text-amber-800 pt-0.5">${formatBRL(o.total)} — ${o.payment_status || "pending"}</p>
+            </div>
+
+            <div class="flex flex-col gap-2 sm:min-w-[195px] shrink-0">
+              <select onchange="updateOrderStatus(${o.id}, this.value)" class="border border-stone-300 rounded-xl px-2.5 py-2 text-xs bg-white font-semibold">
+                <option value="aguardando_pagamento" ${o.order_status === "aguardando_pagamento" ? "selected" : ""}>Aguardando Pagamento</option>
+                <option value="confirmado_pago" ${o.order_status === "confirmado_pago" ? "selected" : ""}>Confirmado / Pago</option>
+                <option value="em_preparo" ${o.order_status === "em_preparo" ? "selected" : ""}>Em Preparo</option>
+                <option value="pronto_entrega" ${o.order_status === "pronto_entrega" ? "selected" : ""}>Pronto / Entrega</option>
+              </select>
+              <a href="https://wa.me/55${cleanPhone}?text=${waText}" target="_blank" rel="noopener noreferrer" class="bg-emerald-600 hover:bg-emerald-700 text-white text-center text-xs font-bold py-2 px-3 rounded-xl transition">
+                Chamar no WhatsApp
+              </a>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function updateOrderStatus(orderId, newStatus) {
+      ORDERS_CACHE = ORDERS_CACHE.map(o => Number(o.id) === Number(orderId) ? { ...o, order_status: newStatus } : o);
+      writeLocalOrders(ORDERS_CACHE);
+      loadAdminOrders();
+      showToast(`Status do pedido #${orderId} atualizado.`, "success");
+
+      if (sb) {
+        try {
+          await sb.from("orders").update({ order_status: newStatus }).eq("id", orderId);
+        } catch (e) {
+          // Mantém local
+        }
+      }
+    }
+
+    // =========================================================================
+    // INICIALIZAÇÃO
+    // =========================================================================
+    document.addEventListener("DOMContentLoaded", () => {
+      const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+      const dateInput = document.getElementById("sched-date");
+      if (dateInput) {
+        dateInput.min = tomorrowStr;
+        dateInput.value = tomorrowStr;
+      }
+
+      const pixConfirmBtn = document.getElementById("btn-confirm-pix-manual");
+      if (pixConfirmBtn) {
+        pixConfirmBtn.addEventListener("click", confirmPixPaymentNow);
+      }
+
+      initCatalog();
+    });
+  </script>
+</body>
+</html>
